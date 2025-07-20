@@ -4,3 +4,4 @@ requests
 pytz
 pyotp
 smartapi-python
+logzero
