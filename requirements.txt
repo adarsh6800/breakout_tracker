@@ -3,4 +3,4 @@ pandas
 requests
 pytz
 pyotp
-smartapi
+smartapi-python
