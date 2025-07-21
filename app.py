@@ -36,24 +36,42 @@ if "alert_history" not in st.session_state:
 # -------------------- Login Using Environment Variables --------------------
 if not st.session_state.logged_in:
     try:
+        st.write("🔍 Starting login process...")
+
         client_id = os.environ.get("CLIENT_ID")
         mpin = os.environ.get("MPIN")
         totp_key = os.environ.get("TOTP_KEY")
         api_key = os.environ.get("API_KEY")
 
+        st.write("📋 Environment Variables Loaded:")
+        st.write(f"CLIENT_ID: {client_id}")
+        st.write(f"MPIN: {'*' * len(mpin) if mpin else None}")
+        st.write(f"TOTP_KEY: {'*' * len(totp_key) if totp_key else None}")
+        st.write(f"API_KEY: {'*' * len(api_key) if api_key else None}")
+
         if not all([client_id, mpin, totp_key, api_key]):
             st.error("❌ One or more environment variables (CLIENT_ID, MPIN, TOTP_KEY, API_KEY) are missing.")
         else:
             totp = pyotp.TOTP(totp_key).now()
+            st.write(f"🔑 Generated TOTP: {totp}")
+
             obj = SmartConnect(api_key=api_key)
+            st.write("🔗 SmartConnect object created.")
+
             data = obj.generateSession(client_id, mpin, totp)
+            st.write("✅ Session generated.")
+            st.write(f"Session Data: {data}")
+
             feed_token = obj.getfeedToken()
+            st.write(f"📥 Feed Token: {feed_token}")
+
             st.session_state.obj = obj
             st.session_state.logged_in = True
             st.success("✅ Logged in successfully!")
 
             # Fetch token map from master file
             master_url = "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json"
+            st.write(f"🌐 Fetching scrip master from {master_url}")
             resp = requests.get(master_url)
             all_symbols = resp.json()
             st.session_state.token_map = {
@@ -62,6 +80,9 @@ if not st.session_state.logged_in:
             st.success(f"✅ Loaded {len(st.session_state.token_map)} NSE-EQ tokens")
     except Exception as e:
         st.error(f"❌ Login failed: {e}")
+        st.write("📛 Exception details:")
+        st.exception(e)
+
 
 # -------------------- Upload File --------------------
 if st.session_state.logged_in:
