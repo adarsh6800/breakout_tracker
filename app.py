@@ -7,6 +7,7 @@ import requests
 import pyotp
 import time
 import json
+import os
 from datetime import datetime
 from SmartApi.smartConnect import SmartConnect
 import pytz
@@ -32,14 +33,17 @@ if "price_loaded" not in st.session_state:
 if "alert_history" not in st.session_state:
     st.session_state.alert_history = [[] for _ in range(10)]
 
-# -------------------- Login Section --------------------
-with st.expander("🔐 Login", expanded=not st.session_state.logged_in):
-    client_id = st.text_input("Client ID")
-    mpin = st.text_input("MPIN", type="password")
-    totp_key = st.text_input("TOTP Secret")
-    api_key = st.text_input("API Key")
-    if st.button("Login"):
-        try:
+# -------------------- Login Using Environment Variables --------------------
+if not st.session_state.logged_in:
+    try:
+        client_id = os.environ.get("CLIENT_ID")
+        mpin = os.environ.get("MPIN")
+        totp_key = os.environ.get("TOTP_KEY")
+        api_key = os.environ.get("API_KEY")
+
+        if not all([client_id, mpin, totp_key, api_key]):
+            st.error("❌ One or more environment variables (CLIENT_ID, MPIN, TOTP_KEY, API_KEY) are missing.")
+        else:
             totp = pyotp.TOTP(totp_key).now()
             obj = SmartConnect(api_key=api_key)
             data = obj.generateSession(client_id, mpin, totp)
@@ -56,8 +60,8 @@ with st.expander("🔐 Login", expanded=not st.session_state.logged_in):
                 sym["name"]: sym["token"] for sym in all_symbols if sym["exch_seg"] == "NSE"
             }
             st.success(f"✅ Loaded {len(st.session_state.token_map)} NSE-EQ tokens")
-        except Exception as e:
-            st.error(f"❌ Login failed: {e}")
+    except Exception as e:
+        st.error(f"❌ Login failed: {e}")
 
 # -------------------- Upload File --------------------
 if st.session_state.logged_in:
@@ -145,6 +149,7 @@ if st.session_state.price_loaded:
         rows = []
         new_alerts = []
         now = datetime.now(tz)
+        play_sound = False
 
         for stock in st.session_state.watchlist:
             ltp = get_ltp(st.session_state.obj, stock["symbol"], stock["token"])
@@ -164,21 +169,31 @@ if st.session_state.price_loaded:
                     stock["match_time"] = now.strftime("%H:%M:%S")
                     st.session_state.last_alert_time[symbol] = now
                     new_alerts.append(symbol)
+                    play_sound = True
 
             rows.append(stock)
 
-        # Display LTP Table
         df = pd.DataFrame([{
             "Signal": "🟢" if r["direction"] == "Bull" else "🔴",
             "Symbol": r["symbol"],
             "Breakout Price": f"₹{r['price']:.2f}" if r["price"] else "-",
             "Current LTP": f"₹{r['ltp']:.2f}" if r["ltp"] else "-",
+            "Up/Down": "⏏️" if r["ltp"] is not None and r["price"] is not None and r["ltp"] > r["price"] else
+                       "🔻" if r["ltp"] is not None and r["price"] is not None and r["ltp"] < r["price"] else "",
             "Matched": "✅" if r["ltp"] is not None and r["price"] is not None and int(r["ltp"]) == int(r["price"]) else "❌",
             "Breakout Time": r["time"].strftime("%I:%M %p") if r["time"] else "-",
             "Time": r["match_time"] if r["match_time"] else ""
         } for r in rows])
 
         table_placeholder.table(df)
+
+        # 🔔 Play alert sound
+        if play_sound:
+            st.markdown("""
+                <audio autoplay>
+                    <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
+                </audio>
+                """, unsafe_allow_html=True)
 
         # -------------------- Recent Alerts Table --------------------
         st.session_state.alert_history = [new_alerts] + st.session_state.alert_history[:9]
@@ -193,3 +208,4 @@ if st.session_state.price_loaded:
         recent_alert_placeholder.table(alert_df)
 
         time.sleep(60)
+
