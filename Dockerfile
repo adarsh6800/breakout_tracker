@@ -23,9 +23,3 @@ EXPOSE 8501
 
 # Run Streamlit app
 CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
-
-# Allow Railway’s env vars to pass into your container
-ENV CLIENT_ID=$CLIENT_ID
-ENV MPIN=$MPIN
-ENV TOTP_KEY=$TOTP_KEY
-ENV API_KEY=$API_KEY
