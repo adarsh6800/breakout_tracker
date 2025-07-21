@@ -1,6 +1,5 @@
 #  streamlit run dashboard.py
 
-
 import streamlit as st
 import pandas as pd
 import requests
@@ -145,6 +144,7 @@ if st.session_state.price_loaded:
         rows = []
         new_alerts = []
         now = datetime.now(tz)
+        play_sound = False
 
         for stock in st.session_state.watchlist:
             ltp = get_ltp(st.session_state.obj, stock["symbol"], stock["token"])
@@ -164,21 +164,31 @@ if st.session_state.price_loaded:
                     stock["match_time"] = now.strftime("%H:%M:%S")
                     st.session_state.last_alert_time[symbol] = now
                     new_alerts.append(symbol)
+                    play_sound = True
 
             rows.append(stock)
 
-        # Display LTP Table
         df = pd.DataFrame([{
             "Signal": "🟢" if r["direction"] == "Bull" else "🔴",
             "Symbol": r["symbol"],
             "Breakout Price": f"₹{r['price']:.2f}" if r["price"] else "-",
             "Current LTP": f"₹{r['ltp']:.2f}" if r["ltp"] else "-",
+            "Up/Down": "⏏️" if r["ltp"] is not None and r["price"] is not None and r["ltp"] > r["price"] else
+                       "🔻" if r["ltp"] is not None and r["price"] is not None and r["ltp"] < r["price"] else "",
             "Matched": "✅" if r["ltp"] is not None and r["price"] is not None and int(r["ltp"]) == int(r["price"]) else "❌",
             "Breakout Time": r["time"].strftime("%I:%M %p") if r["time"] else "-",
             "Time": r["match_time"] if r["match_time"] else ""
         } for r in rows])
 
         table_placeholder.table(df)
+
+        # 🔔 Play alert sound
+        if play_sound:
+            st.markdown("""
+                <audio autoplay>
+                    <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
+                </audio>
+                """, unsafe_allow_html=True)
 
         # -------------------- Recent Alerts Table --------------------
         st.session_state.alert_history = [new_alerts] + st.session_state.alert_history[:9]
